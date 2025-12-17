@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FoodZone Orders - Track your food orders and view order history.">
+  <meta name="author" content="FoodZone">
+  <meta name="application-name" content="foodzone">
+  <title>Orders - FoodZone</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="footer.css">
+  <style>
+    .orders-container {
+      padding: 2rem 0;
+    }
+    .order-card {
+      background-color: var(--white);
+      border-radius: var(--border-radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--light-gray);
+    }
+    .order-id {
+      font-weight: 700;
+      font-size: 1.125rem;
+    }
+    .order-status {
+      padding: 0.375rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .status-PENDING { background-color: #fef3c7; color: #92400e; }
+    .status-PLACED { background-color: #dbeafe; color: #1e40af; }
+    .status-ACCEPTED { background-color: #d1fae5; color: #065f46; }
+    .status-PREPARING { background-color: #e0e7ff; color: #3730a3; }
+    .status-READY { background-color: #fce7f3; color: #831843; }
+    .status-DELIVERED { background-color: #d1fae5; color: #065f46; }
+    .status-CANCELLED { background-color: #fee2e2; color: #991b1b; }
+    .order-items {
+      margin-bottom: 1rem;
+    }
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+    }
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 1rem;
+      border-top: 1px solid var(--light-gray);
+    }
+    .order-total {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">
+          <h1>🍔 FoodZone</h1>
+        </div>
+        <nav class="nav">
+          <a href="index.html" class="nav-link">Home</a>
+          <a href="orders.html" class="nav-link active">Orders</a>
+          <a href="cart.html" class="nav-link">Cart</a>
+          <button id="authBtn" class="btn btn-primary">Login</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="container orders-container">
+      <h2 class="section-title">Your Orders</h2>
+      <div id="ordersContent">
+        <p>Loading orders...</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section footer-brand">
+        <span class="footer-logo">🍔 FoodZone</span>
+        <p class="footer-description">FoodZone is an online food & grocery delivery platform.</p>
+      </div>
+
+      <div class="footer-section">
+        <h3>Legal</h3>
+        <ul class="footer-links">
+          <li><a href="privacy-policy.html">Privacy Policy</a></li>
+          <li><a href="terms-conditions.html">Terms & Conditions</a></li>
+          <li><a href="refund-policy.html">Refund & Cancellation Policy</a></li>
+          <li><a href="delivery-policy.html">Delivery Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-section">
+        <h3>Help & Support</h3>
+        <ul class="footer-links">
+          <li><a href="contact.html">Contact Us</a></li>
+          <li><a href="help-center.html">Help Center</a></li>
+          <li><a href="report-issue.html">Report an Issue</a></li>
+        </ul>
+        <div class="footer-contact" style="margin-top: 1.25rem;">
+          <p>📧 <a href="mailto:foodzonesupport@gmail.com">foodzonesupport@gmail.com</a></p>
+          <p>📞 <a href="tel:+918917568630">+91 89175 68630</a></p>
+          <p>📞 <a href="tel:+919778639461">+91 97786 39461</a></p>
+        </div>
+      </div>
+
+      <div class="footer-section">
+        <h3>Payments & App</h3>
+        <p style="color: #d1d5db; font-size: 0.9rem; margin-bottom: 0.5rem;">Secure Payments</p>
+        <div class="payment-icons">
+          <div class="payment-icon">UPI</div>
+          <div class="payment-icon">GPay</div>
+          <div class="payment-icon">PhonePe</div>
+          <div class="payment-icon">Paytm</div>
+        </div>
+        <a href="#" class="app-badge">
+          <span class="app-badge-icon">📱</span>
+          Google Play
+        </a>
+        <span class="app-coming-soon">App coming soon on Play Store</span>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-content">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <span class="follow-text">Follow Us</span>
+          <div class="social-links">
+            <a href="https://facebook.com" target="_blank" class="social-icon" aria-label="Facebook">f</a>
+            <a href="https://instagram.com" target="_blank" class="social-icon" aria-label="Instagram">📷</a>
+            <a href="https://twitter.com" target="_blank" class="social-icon" aria-label="X">𝕏</a>
+            <a href="https://youtube.com" target="_blank" class="social-icon" aria-label="YouTube">▶</a>
+          </div>
+        </div>
+        <div class="footer-copyright">
+          © 2025 FoodZone. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+      loadOrders();
+    });
+
+    function checkAuth() {
+      const token = getAuthToken();
+      if (!token) {
+        window.location.href = 'index.html';
+      }
+    }
+
+    async function loadOrders() {
+      try {
+        const response = await apiRequest(CONFIG.ENDPOINTS.ORDERS.LIST);
+
+        if (response.success) {
+          displayOrders(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+        document.getElementById('ordersContent').innerHTML = '<p>Failed to load orders</p>';
+      }
+    }
+
+    function displayOrders(orders) {
+      const ordersContent = document.getElementById('ordersContent');
+
+      if (!orders || orders.length === 0) {
+        ordersContent.innerHTML = `
+          <div style="text-align: center; padding: 3rem 0;">
+            <h3>No orders yet</h3>
+            <p>Start ordering delicious food!</p>
+            <a href="index.html" class="btn btn-primary">Browse Products</a>
+          </div>
+        `;
+        return;
+      }
+
+      let ordersHTML = '';
+
+      orders.forEach(order => {
+        ordersHTML += `
+          <div class="order-card">
+            <div class="order-header">
+              <div>
+                <div class="order-id">Order #${order.id}</div>
+                <div style="color: var(--gray); font-size: 0.875rem;">
+                  ${new Date(order.created_at).toLocaleString()}
+                </div>
+                <div style="color: var(--gray); font-size: 0.875rem; margin-top: 0.25rem;">
+                  ${order.vendor_name}
+                </div>
+              </div>
+              <span class="order-status status-${order.order_status}">${order.order_status}</span>
+            </div>
+            <div class="order-items">
+              ${order.items.map(item => `
+                <div class="order-item">
+                  <span>${item.name} × ${item.quantity}</span>
+                  <span>₹${(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                </div>
+              `).join('')}
+            </div>
+            <div class="order-footer">
+              <div class="order-total">Total: ₹${parseFloat(order.total_amount).toFixed(2)}</div>
+              <div>
+                ${order.order_status === 'PENDING' || order.order_status === 'PLACED' ?
+                  `<button class="btn btn-danger" onclick="cancelOrder(${order.id})">Cancel Order</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      ordersContent.innerHTML = ordersHTML;
+    }
+
+    async function cancelOrder(orderId) {
+      if (!confirm('Are you sure you want to cancel this order?')) return;
+
+      try {
+        const response = await apiRequest(CONFIG.ENDPOINTS.ORDERS.CANCEL(orderId), {
+          method: 'POST',
+          body: JSON.stringify({ reason: 'Customer requested cancellation' })
+        });
+
+        if (response.success) {
+          showToast('Order cancelled successfully', 'success');
+          loadOrders();
+        }
+      } catch (error) {
+        showToast(error.message || 'Failed to cancel order', 'error');
+      }
+    }
+  </script>
+</body>
+</html>
