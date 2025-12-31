@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { query } from '../config/database.js';
 import otpService from '../services/otpService.js';
 
@@ -106,6 +107,8 @@ export const userLogin = async (req, res, next) => {
 };
 
 export const userLoginWithOTP = async (req, res, next) => {
+  return res.status(410).json({ success: false, message: 'Phone OTP disabled. Use /api/auth/user/login-otp-email.' });
+
   try {
     const { phone } = req.body;
 
@@ -135,6 +138,60 @@ export const userLoginWithOTP = async (req, res, next) => {
     next(error);
   }
 };
+
+
+export const userLoginWithEmailOTP = async (req, res, next) => {
+  try {
+    const rawEmail = req.body?.email;
+    const email = (rawEmail || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email required' });
+    }
+
+    let [user] = await query(
+      'SELECT id, name, email FROM users WHERE email = ?',
+      [email]
+    );
+
+    // Email-only login: auto-create user if not exists (phone/password are NOT NULL in DB)
+    if (!user) {
+      const name = (email.split('@')[0] || 'User').slice(0, 255);
+      const randomPwd = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPwd, 10);
+
+      let phone = null;
+
+      for (let i = 0; i < 5; i++) {
+        const hashHex = crypto.createHash('sha1').update(`${email}:${i}`).digest('hex');
+        const n = (BigInt('0x' + hashHex.slice(0, 12)) % 10000000000n);
+        const ten = (6000000000n + (n % 4000000000n)); // 10-digit, starts 6-9
+        phone = ten.toString().padStart(10, '0');
+
+        const [existingPhone] = await query('SELECT id FROM users WHERE phone = ?', [phone]);
+        if (!existingPhone) break;
+      }
+
+      const result = await query(
+        `INSERT INTO users (name, phone, email, password) VALUES (?, ?, ?, ?)`,
+        [name, phone, email, hashedPassword]
+      );
+
+      user = { id: result.insertId, name, email };
+    }
+
+    await otpService.sendOTPEmail(email, user.id);
+
+    return res.json({
+      success: true,
+      message: 'OTP sent to your email',
+      data: { userId: user.id, email }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const verifyUserOTP = async (req, res, next) => {
   try {
@@ -242,7 +299,46 @@ export const vendorLogin = async (req, res, next) => {
   }
 };
 
+
+export const vendorLoginWithEmailOTP = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const [vendor] = await query(
+      'SELECT id, vendor_name, email, status FROM vendors WHERE email = ?',
+      [email]
+    );
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found with this email'
+      });
+    }
+
+    if (vendor.status !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is inactive. Please contact admin.'
+      });
+    }
+
+    await otpService.sendOTPEmail(email, vendor.id);
+
+    res.json({
+      success: true,
+      message: 'OTP sent to your email',
+      data: { vendorId: vendor.id, email }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export const vendorLoginWithOTP = async (req, res, next) => {
+  return res.status(410).json({ success: false, message: 'Phone OTP disabled. Use /api/auth/vendor/login-otp-email.' });
+
   try {
     const { phone } = req.body;
 
@@ -360,12 +456,12 @@ export const adminLogin = async (req, res, next) => {
     const token = generateToken({
       userId: admin.id,
       email: admin.email,
-      role: 'admin'
+      role: admin.role || 'admin'
     });
 
     const refreshToken = generateRefreshToken({
       userId: admin.id,
-      role: 'admin'
+      role: admin.role || 'admin'
     });
 
     await query(
@@ -389,6 +485,57 @@ export const adminLogin = async (req, res, next) => {
     next(error);
   }
 };
+
+
+export const vendorAdminLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    const [vendorAdmin] = await query(
+      'SELECT * FROM vendor_admin_users WHERE email = ?',
+      [email]
+    );
+
+    if (!vendorAdmin) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, vendorAdmin.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    if (vendorAdmin.is_active !== 1) {
+      return res.status(403).json({ success: false, message: 'Your account is inactive.' });
+    }
+
+    const token = generateToken({
+      userId: vendorAdmin.id,
+      email: vendorAdmin.email,
+      role: 'vendor_admin',
+      vendorId: vendorAdmin.vendor_id,
+      vendorAdminRole: vendorAdmin.role || 'manager'
+    });
+
+    const refreshToken = generateRefreshToken({
+      userId: vendorAdmin.id,
+      role: 'vendor_admin'
+    });
+
+    delete vendorAdmin.password;
+
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      data: { vendorAdmin, token, refreshToken }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 
 export const refreshAccessToken = async (req, res, next) => {
   try {

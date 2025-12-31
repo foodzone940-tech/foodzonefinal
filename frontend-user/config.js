@@ -1,10 +1,10 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = '/api';
 
 const CONFIG = {
   API_BASE_URL,
   ENDPOINTS: {
     AUTH: {
-      LOGIN_OTP: `${API_BASE_URL}/auth/user/login-otp`,
+      LOGIN_OTP: `${API_BASE_URL}/auth/user/login-otp-email`,
       VERIFY_OTP: `${API_BASE_URL}/auth/user/verify-otp`,
       REGISTER: `${API_BASE_URL}/auth/user/register`,
       LOGIN: `${API_BASE_URL}/auth/user/login`

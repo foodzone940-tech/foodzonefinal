@@ -73,7 +73,7 @@
   </div>
 
   <script>
-    const API_BASE_URL = 'http://localhost:5000/api';
+    const API_BASE_URL = '/api';
     const CONFIG = {
       ENDPOINTS: {
         AUTH: { LOGIN: `${API_BASE_URL}/auth/admin/login` },
@@ -83,7 +83,10 @@
           VENDORS: `${API_BASE_URL}/admin/vendors`,
           ORDERS: `${API_BASE_URL}/admin/orders`,
           PAYMENTS: `${API_BASE_URL}/admin/payments`,
-          UPDATE_VENDOR_STATUS: (id) => `${API_BASE_URL}/admin/vendors/${id}/status`
+          UPDATE_VENDOR_STATUS: (id) => `${API_BASE_URL}/admin/vendors/${id}/status`,
+            APP_CONFIG: `${API_BASE_URL}/admin/app-config`,
+            APP_CONFIG_VALUE: (key) => `${API_BASE_URL}/admin/app-config/${encodeURIComponent(key)}`,
+            APP_CONFIG_IMAGE: (key) => `${API_BASE_URL}/admin/app-config/${encodeURIComponent(key)}/image`
         }
       }
     };
@@ -319,9 +322,133 @@
       }
     }
 
-    function loadSettings() {
-      document.getElementById('pageContent').innerHTML = '<p>Settings page - Configure delivery charges, coupons, and system settings</p>';
-    }
+          async function loadSettings() {
+        const el = document.getElementById('pageContent');
+        el.innerHTML = '<p>Loading settings...</p>';
+
+        try {
+          const resp = await apiRequest(CONFIG.ENDPOINTS.ADMIN.APP_CONFIG);
+          const rows = resp.data || [];
+          const cfg = {};
+          rows.forEach(r => { cfg[r.config_key] = r.config_value; });
+
+          el.innerHTML = renderSettingsHTML(cfg);
+          bindSettingsActions();
+        } catch (error) {
+          console.error(error);
+          showToast('Failed to load settings', 'error');
+          el.innerHTML = '<p>Failed to load settings</p>';
+        }
+      }
+
+      function renderSettingsHTML(cfg) {
+        const safe = (v) => (v === null || v === undefined) ? '' : String(v);
+
+        const imgKeys = [
+          ['site_logo','Site Logo'],
+          ['site_favicon','Site Favicon'],
+          ['site_app_icon','Site App Icon'],
+          ['app_logo','App Logo'],
+          ['app_icon','App Icon'],
+          ['app_splash','App Splash'],
+          ['vendor_default_logo','Vendor Default Logo'],
+          ['product_placeholder_image','Product Placeholder Image'],
+          ['scanner_qr','Scanner QR (UPI)']
+        ];
+
+        let html = `
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">UPI ID</div>
+              <input type="text" id="cfg_upi_id" class="form-input" value="${safe(cfg.upi_id)}" placeholder="example@upi">
+              <button class="btn btn-primary btn-block" id="btn_save_upi_id">Save UPI ID</button>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;">
+            <h2 style="margin:0 0 10px 0;">Branding / Assets</h2>
+            <div class="stats-grid" id="assetsGrid">
+        `;
+
+        imgKeys.forEach(([k, label]) => {
+          const val = safe(cfg[k]);
+          const imgTag = val
+            ? `<img src="${val}" alt="${label}" style="max-width:220px;max-height:120px;display:block;margin:10px 0;border:1px solid #ddd;border-radius:8px;">`
+            : `<div style="margin:10px 0;color:#888;">No image set</div>`;
+
+          html += `
+            <div class="stat-card">
+              <div class="stat-label">${label}</div>
+              ${imgTag}
+              <input type="file" id="file_${k}" class="form-input" accept="image/*">
+              <button class="btn btn-primary btn-block" id="btn_upload_${k}">Upload</button>
+              <div style="font-size:12px;word-break:break-all;margin-top:8px;color:#666;">${val}</div>
+            </div>
+          `;
+        });
+
+        html += `
+            </div>
+            <p style="margin-top:12px;color:#666;font-size:13px;">
+              Public fetch endpoint: <code>/api/public/ui-config</code> (website/app should use this — no hardcoding)
+            </p>
+          </div>
+        `;
+
+        return html;
+      }
+
+      function bindSettingsActions() {
+        const saveBtn = document.getElementById('btn_save_upi_id');
+        if (saveBtn) {
+          saveBtn.addEventListener('click', async () => {
+            const v = document.getElementById('cfg_upi_id').value.trim();
+            try {
+              await apiRequest(CONFIG.ENDPOINTS.ADMIN.APP_CONFIG_VALUE('upi_id'), {
+                method: 'PUT',
+                body: JSON.stringify({ value: v })
+              });
+              showToast('UPI ID saved', 'success');
+            } catch (e) {
+              showToast(e.message || 'Failed to save UPI ID', 'error');
+            }
+          });
+        }
+
+        const keys = ['site_logo','site_favicon','site_app_icon','app_logo','app_icon','app_splash','vendor_default_logo','product_placeholder_image','scanner_qr'];
+        keys.forEach((k) => {
+          const btn = document.getElementById(`btn_upload_${k}`);
+          if (!btn) return;
+
+          btn.addEventListener('click', async () => {
+            const inp = document.getElementById(`file_${k}`);
+            const f = inp && inp.files && inp.files[0];
+            if (!f) { showToast('Select an image first', 'error'); return; }
+
+            const fd = new FormData();
+            fd.append('image', f);
+
+            try {
+              await apiUpload(CONFIG.ENDPOINTS.ADMIN.APP_CONFIG_IMAGE(k), fd);
+              showToast('Image uploaded', 'success');
+              await loadSettings();
+            } catch (e) {
+              showToast(e.message || 'Upload failed', 'error');
+            }
+          });
+        });
+      }
+
+      const apiUpload = async (url, formData) => {
+        const token = getAuthToken();
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(url, { method: 'PUT', headers, body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Request failed');
+        return data;
+      };
   </script>
 </body>
 </html>

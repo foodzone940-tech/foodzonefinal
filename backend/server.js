@@ -13,10 +13,13 @@ import paymentService from './src/services/paymentService.js';
 
 import authRoutes from './src/routes/authRoutes.js';
 import productRoutes from './src/routes/productRoutes.js';
+import userRoutes from './src/routes/userRoutes.js';
 import cartRoutes from './src/routes/cartRoutes.js';
 import orderRoutes from './src/routes/orderRoutes.js';
 import vendorRoutes from './src/routes/vendorRoutes.js';
+import vendorAdminRoutes from './src/routes/vendorAdminRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
+import publicRoutes from './src/routes/publicRoutes.js';
 
 dotenv.config();
 
@@ -24,6 +27,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
@@ -78,11 +82,15 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
+
+  app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/vendor', vendorRoutes);
+app.use('/api/vendor-admin', vendorAdminRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use(notFoundHandler);

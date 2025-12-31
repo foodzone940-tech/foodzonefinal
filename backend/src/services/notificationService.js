@@ -15,6 +15,10 @@ class NotificationService {
           privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL
         };
+if (process.env.FIREBASE_ENABLED !== 'true') {
+  console.log('[Firebase] Disabled, skipping init');
+  return;
+}
 
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount)
@@ -140,6 +144,9 @@ class NotificationService {
           user: { title: 'Order Placed', message: 'Your order has been placed successfully!' },
           vendor: { title: 'New Order', message: `New order #${orderId} from ${order.user_name}` }
         },
+
+
+
         'ACCEPTED': {
           user: { title: 'Order Accepted', message: `${order.vendor_name} is preparing your order` },
           vendor: null
@@ -219,39 +226,12 @@ class NotificationService {
             order_id: orderId.toString(),
             status
           }
-        );
+          );
+  
       }
-
       return { success: true };
     } catch (error) {
       console.error('Payment notification error:', error);
-      throw error;
-    }
-  }
-
-  async registerDeviceToken(userId, vendorId, token, deviceType = 'android') {
-    try {
-      const existingToken = await query(
-        'SELECT id FROM push_tokens WHERE token = ?',
-        [token]
-      );
-
-      if (existingToken.length > 0) {
-        await query(
-          'UPDATE push_tokens SET user_id = ?, vendor_id = ?, device_type = ? WHERE token = ?',
-          [userId, vendorId, deviceType, token]
-        );
-      } else {
-        await query(
-          `INSERT INTO push_tokens (user_id, vendor_id, token, device_type)
-           VALUES (?, ?, ?, ?)`,
-          [userId, vendorId, token, deviceType]
-        );
-      }
-
-      return { success: true, message: 'Device token registered' };
-    } catch (error) {
-      console.error('Device token registration error:', error);
       throw error;
     }
   }

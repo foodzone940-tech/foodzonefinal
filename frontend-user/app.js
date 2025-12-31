@@ -1,14 +1,82 @@
 let currentUserId = null;
+let PRODUCT_PLACEHOLDER_IMG = '';
+let VENDOR_DEFAULT_LOGO = '';
 
-document.addEventListener('DOMContentLoaded', () => {
+async function loadUiConfig() {
+  try {
+    const resp = await fetch('/api/public/ui-config');
+    const json = await resp.json();
+    if (!resp.ok || !json || !json.success) return;
+
+    const cfg = (json.data && json.data.config) ? json.data.config : {};
+    PRODUCT_PLACEHOLDER_IMG = cfg.product_placeholder_image || '';
+    VENDOR_DEFAULT_LOGO = cfg.vendor_default_logo || '';
+
+    const banners = (json.data && json.data.banners) ? json.data.banners : [];
+
+    // Header logo
+    // Favicon
+    if (cfg.site_favicon) {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = cfg.site_favicon;
+    }
+
+    // Site App Icon (fallback logo image if site_logo missing)
+    if (!cfg.site_logo && cfg.site_app_icon) {
+      const logoDiv = document.querySelector('.logo');
+      if (logoDiv) logoDiv.innerHTML = `<img src="${cfg.site_app_icon}" alt="FoodZone" class="site-logo-img">`;
+
+      const footerLogo = document.querySelector('.footer-logo');
+      if (footerLogo) footerLogo.innerHTML = `<img src="${cfg.site_app_icon}" alt="FoodZone" class="footer-logo-img">`;
+    }
+
+    if (cfg.site_logo) {
+      const logoDiv = document.querySelector('.logo');
+      if (logoDiv) logoDiv.innerHTML = `<img src="${cfg.site_logo}" alt="FoodZone" class="site-logo-img">`;
+
+      const footerLogo = document.querySelector('.footer-logo');
+      if (footerLogo) footerLogo.innerHTML = `<img src="${cfg.site_logo}" alt="FoodZone" class="footer-logo-img">`;
+    }
+
+    // Hero banner (use latest active banner)
+    if (banners.length && banners[0].image_url) {
+      const hero = document.querySelector('.hero');
+      if (hero) {
+        hero.style.backgroundImage = `linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), url('${banners[0].image_url}')`;
+        hero.style.backgroundSize = 'cover';
+        hero.style.backgroundPosition = 'center';
+        hero.style.backgroundRepeat = 'no-repeat';
+      }
+    }
+  } catch (e) {
+    console.error('UI config load failed:', e);
+  }
+}
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadUiConfig();
   initApp();
   checkAuth();
-  loadCategories();
-  loadVendors();
-  loadProducts();
   updateCartBadge();
-});
 
+  const page = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+
+  if (page === 'vendor.html') {
+    loadVendorPage();
+  } else if (page === 'product.html') {
+    loadProductPage();
+  } else {
+    loadCategories();
+    loadVendors();
+    loadProducts();
+  }
+});
 function initApp() {
   const authBtn = document.getElementById('authBtn');
   const authModal = document.getElementById('authModal');
@@ -61,10 +129,10 @@ function checkAuth() {
 }
 
 async function sendOTP() {
-  const phone = document.getElementById('loginPhone').value.trim();
+  const email = document.getElementById('loginEmail').value.trim();
 
-  if (!/^[0-9]{10}$/.test(phone)) {
-    showToast('Please enter a valid 10-digit phone number', 'error');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('Please enter a valid email address', 'error');
     return;
   }
 
@@ -74,7 +142,7 @@ async function sendOTP() {
 
     const response = await apiRequest(CONFIG.ENDPOINTS.AUTH.LOGIN_OTP, {
       method: 'POST',
-      body: JSON.stringify({ phone })
+      body: JSON.stringify({ email })
     });
 
     if (response.success) {
@@ -116,7 +184,7 @@ async function verifyOTP() {
       showToast('Login successful!', 'success');
       document.getElementById('authModal').classList.remove('show');
       checkAuth();
-      document.getElementById('loginPhone').value = '';
+      document.getElementById('loginEmail').value = '';
       document.getElementById('otpInput').value = '';
       document.getElementById('otpSection').classList.add('hidden');
     }
@@ -181,6 +249,17 @@ async function loadVendors() {
             <p class="vendor-meta">${vendor.address || 'Location not specified'}</p>
           </div>
         `;
+
+        const vimg = vendor.image || VENDOR_DEFAULT_LOGO;
+        if (vimg) {
+          const vEl = vendorCard.querySelector('.vendor-image');
+          if (vEl) {
+            vEl.style.backgroundImage = `url('${vimg}')`;
+            vEl.style.backgroundSize = 'cover';
+            vEl.style.backgroundPosition = 'center';
+          }
+        }
+
         vendorCard.addEventListener('click', () => {
           window.location.href = `vendor.html?id=${vendor.id}`;
         });
@@ -218,6 +297,119 @@ async function loadProducts(filters = {}) {
   }
 }
 
+
+function getPageId() {
+  return new URLSearchParams(window.location.search).get('id');
+}
+
+async function loadVendorPage() {
+  const vendorId = getPageId();
+  if (!vendorId) {
+    showToast('Vendor not found', 'error');
+    return;
+  }
+
+  try {
+    const response = await apiRequest(`${CONFIG.ENDPOINTS.PRODUCTS.VENDORS}/${vendorId}`);
+    const vendorsList = document.getElementById('vendorsList');
+    const productsList = document.getElementById('productsList');
+
+    if (!response.success || !response.data) {
+      if (vendorsList) vendorsList.innerHTML = '<p>Vendor not found</p>';
+      if (productsList) productsList.innerHTML = '<p>No products available</p>';
+      return;
+    }
+
+    const v = response.data;
+
+    const heroTitle = document.querySelector('.hero-title');
+    const heroSub = document.querySelector('.hero-subtitle');
+    if (heroTitle) heroTitle.textContent = v.vendor_name || 'Vendor';
+    if (heroSub) heroSub.textContent = v.address || 'Location not specified';
+
+    if (vendorsList) {
+      vendorsList.innerHTML = '';
+      const vendorCard = document.createElement('div');
+      vendorCard.className = 'vendor-card';
+      vendorCard.innerHTML = `
+        <div class="vendor-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+        <div class="vendor-info">
+          <h4 class="vendor-name">${v.vendor_name || ''}</h4>
+          <p class="vendor-meta">${(v.products || []).length} items</p>
+          <p class="vendor-meta">${v.address || 'Location not specified'}</p>
+        </div>
+      `;
+
+      const vimg = v.image || VENDOR_DEFAULT_LOGO;
+      if (vimg) {
+        const vEl = vendorCard.querySelector('.vendor-image');
+        if (vEl) {
+          vEl.style.backgroundImage = `url('${vimg}')`;
+          vEl.style.backgroundSize = 'cover';
+          vEl.style.backgroundPosition = 'center';
+        }
+      }
+
+      vendorsList.appendChild(vendorCard);
+    }
+
+    if (productsList) {
+      productsList.innerHTML = '';
+      const items = v.products || [];
+      if (items.length > 0) {
+        items.forEach(product => productsList.appendChild(createProductCard(product)));
+      } else {
+        productsList.innerHTML = '<p>No products available</p>';
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load vendor page:', error);
+    const vendorsList = document.getElementById('vendorsList');
+    const productsList = document.getElementById('productsList');
+    if (vendorsList) vendorsList.innerHTML = '<p>Failed to load vendor</p>';
+    if (productsList) productsList.innerHTML = '<p>Failed to load products</p>';
+  }
+}
+
+async function loadProductPage() {
+  const productId = getPageId();
+  if (!productId) {
+    showToast('Product not found', 'error');
+    return;
+  }
+
+  try {
+    const response = await apiRequest(`${CONFIG.ENDPOINTS.PRODUCTS.LIST}/${productId}`);
+    const vendorsList = document.getElementById('vendorsList');
+    const productsList = document.getElementById('productsList');
+
+    if (!response.success || !response.data) {
+      if (productsList) productsList.innerHTML = '<p>Product not found</p>';
+      return;
+    }
+
+    const p = response.data;
+
+    const heroTitle = document.querySelector('.hero-title');
+    const heroSub = document.querySelector('.hero-subtitle');
+    if (heroTitle) heroTitle.textContent = p.name || 'Product';
+    if (heroSub) heroSub.textContent = p.vendor_name ? `Sold by ${p.vendor_name}` : (p.category_name || '');
+
+    if (vendorsList && p.vendor_id) {
+      vendorsList.innerHTML = `<p style="margin:0;">Sold by <a href="vendor.html?id=${p.vendor_id}">${p.vendor_name || 'Vendor'}</a></p>`;
+    }
+
+    if (productsList) {
+      productsList.innerHTML = '';
+      productsList.appendChild(createProductCard(p));
+    }
+  } catch (error) {
+    console.error('Failed to load product page:', error);
+    const productsList = document.getElementById('productsList');
+    if (productsList) productsList.innerHTML = '<p>Failed to load product</p>';
+  }
+}
+
 function createProductCard(product) {
   const card = document.createElement('div');
   card.className = 'product-card';
@@ -233,6 +425,17 @@ function createProductCard(product) {
       </div>
     </div>
   `;
+
+    const pimg = product.image || PRODUCT_PLACEHOLDER_IMG;
+    if (pimg) {
+      const pEl = card.querySelector('.product-image');
+      if (pEl) {
+        pEl.style.backgroundImage = `url('${pimg}')`;
+        pEl.style.backgroundSize = 'cover';
+        pEl.style.backgroundPosition = 'center';
+      }
+    }
+
 
   card.querySelector('.product-image').addEventListener('click', () => {
     window.location.href = `product.html?id=${product.id}`;

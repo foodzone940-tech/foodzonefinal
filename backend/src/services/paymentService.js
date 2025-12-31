@@ -123,52 +123,106 @@ class PaymentService {
         return { success: false, message: 'Invalid webhook signature' };
       }
 
-      const event = payload.event;
-      const paymentEntity = payload.payload.payment.entity;
+      const event = payload?.event;
+      const paymentEntity = payload?.payload?.payment?.entity;
+
+      if (!event || !paymentEntity) {
+        return { success: false, message: 'Invalid webhook payload' };
+      }
+
+      const razorpayOrderId = paymentEntity.order_id;
+      const razorpayPaymentId = paymentEntity.id;
 
       if (event === 'payment.captured') {
         await transaction(async (conn) => {
-          const [txn] = await conn.execute(
-            'SELECT order_id FROM payment_transactions WHERE transaction_id = ?',
-            [paymentEntity.order_id]
+          const [rows] = await conn.execute(
+            'SELECT order_id FROM payment_transactions WHERE transaction_id = ? LIMIT 1',
+            [razorpayOrderId]
           );
+          if (!rows || rows.length === 0) return;
 
-          if (txn) {
+          const orderId = rows[0].order_id;
+
+          // Single source of truth: if order already has a SUCCESS transaction, ignore webhook
+          const [succ] = await conn.execute(
+            "SELECT id, transaction_id FROM payment_transactions WHERE order_id = ? AND status = 'success' LIMIT 1",
+            [orderId]
+          );
+          if (succ && succ.length > 0) return;
+
+          try {
             await conn.execute(
               `UPDATE payment_transactions
                SET status = 'success'
                WHERE transaction_id = ?`,
-              [paymentEntity.order_id]
+              [razorpayOrderId]
             );
+          } catch (e) {
+            // DB constraint safety: ignore duplicates (idempotent)
+            if (e && e.code === 'ER_DUP_ENTRY') return;
+            throw e;
+          }
 
-            await conn.execute(
-              `UPDATE orders
-               SET payment_status = 'PAID', transaction_id = ?, order_status = 'PLACED'
-               WHERE id = ?`,
-              [paymentEntity.id, txn.order_id]
-            );
+          const [oRows] = await conn.execute(
+            'SELECT payment_status, order_status FROM orders WHERE id = ? LIMIT 1',
+            [orderId]
+          );
+          const currentPaymentStatus = oRows?.[0]?.payment_status;
+          const currentOrderStatus = oRows?.[0]?.order_status;
 
-            await conn.execute(
-              `INSERT INTO order_status_history (order_id, status)
-               VALUES (?, ?)`,
-              [txn.order_id, 'PLACED']
-            );
+          if (currentPaymentStatus !== 'PAID') {
+            // Don't downgrade order status (e.g., DELIVERED -> PLACED)
+            if (!currentOrderStatus || currentOrderStatus === 'PENDING') {
+              await conn.execute(
+                `UPDATE orders
+                 SET payment_status = 'PAID', transaction_id = ?, order_status = 'PLACED'
+                 WHERE id = ?`,
+                [razorpayPaymentId, orderId]
+              );
+
+              await conn.execute(
+                `INSERT INTO order_status_history (order_id, status)
+                 SELECT ?, 'PLACED'
+                 WHERE NOT EXISTS (
+                   SELECT 1 FROM order_status_history WHERE order_id = ? AND status = 'PLACED'
+                 )`,
+                [orderId, orderId]
+              );
+            } else {
+              await conn.execute(
+                `UPDATE orders
+                 SET payment_status = 'PAID', transaction_id = ?
+                 WHERE id = ?`,
+                [razorpayPaymentId, orderId]
+              );
+            }
           }
         });
       } else if (event === 'payment.failed') {
-        await query(
-          `UPDATE payment_transactions
-           SET status = 'failed'
-           WHERE transaction_id = ?`,
-          [paymentEntity.order_id]
-        );
+        await transaction(async (conn) => {
+          const [rows] = await conn.execute(
+            'SELECT order_id FROM payment_transactions WHERE transaction_id = ? LIMIT 1',
+            [razorpayOrderId]
+          );
+          if (!rows || rows.length === 0) return;
 
-        await query(
-          `UPDATE orders
-           SET payment_status = 'FAILED', order_status = 'CANCELLED'
-           WHERE id = (SELECT order_id FROM payment_transactions WHERE transaction_id = ?)`,
-          [paymentEntity.order_id]
-        );
+          const orderId = rows[0].order_id;
+
+          await conn.execute(
+            `UPDATE payment_transactions
+             SET status = 'failed'
+             WHERE transaction_id = ?`,
+            [razorpayOrderId]
+          );
+
+          // Do not override a PAID or DELIVERED order
+          await conn.execute(
+            `UPDATE orders
+             SET payment_status = 'FAILED', order_status = 'CANCELLED'
+             WHERE id = ? AND payment_status <> 'PAID' AND order_status <> 'DELIVERED'`,
+            [orderId]
+          );
+        });
       }
 
       return { success: true };

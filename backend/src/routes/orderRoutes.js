@@ -47,7 +47,7 @@ router.post(
   '/',
   [
     body('deliveryAddress').trim().notEmpty().withMessage('Delivery address is required'),
-    body('paymentMode').isIn(['online', 'cod']).withMessage('Valid payment mode required')
+    body('paymentMode').isIn(['online', 'cod', 'scanner', 'upi', 'qr']).withMessage('Valid payment mode required')
   ],
   asyncHandler(createOrder)
 );

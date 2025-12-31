@@ -301,7 +301,7 @@ For testing without mobile app:
 # Using curl or Postman
 
 # 1. Request OTP
-curl -X POST http://localhost:5000/api/auth/user/login-otp \
+curl -X POST http://localhost:5000/api/auth/user/login-otp-email \
   -H "Content-Type: application/json" \
   -d '{"phone": "9876543210"}'
 

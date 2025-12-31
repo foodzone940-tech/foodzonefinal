@@ -1,18 +1,74 @@
 import { query, transaction } from '../config/database.js';
 import notificationService from '../services/notificationService.js';
 
-export const getVendorDashboard = async (req, res, next) => {
+
+
+export const getVendorBankDetails = async (req, res, next) => {
   try {
     const vendorId = req.user.userId;
 
-    const [todayOrders] = await query(
-      `SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue
-       FROM orders
-       WHERE vendor_id = ? AND DATE(created_at) = CURDATE()`,
+    const [bank] = await query(
+      `SELECT id, vendor_id, account_holder, account_number, ifsc_code, bank_name, branch_name, created_at
+       FROM vendor_bank_details
+       WHERE vendor_id = ?
+       LIMIT 1`,
       [vendorId]
     );
 
-    const [totalOrders] = await query(
+    res.json({
+      success: true,
+      data: bank || null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const upsertVendorBankDetails = async (req, res, next) => {
+  try {
+    const vendorId = req.user.userId;
+    const { accountHolder, accountNumber, ifscCode, bankName, branchName } = req.body;
+
+    await query(
+      `INSERT INTO vendor_bank_details (vendor_id, account_holder, account_number, ifsc_code, bank_name, branch_name)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         account_holder = VALUES(account_holder),
+         account_number = VALUES(account_number),
+         ifsc_code = VALUES(ifsc_code),
+         bank_name = VALUES(bank_name),
+         branch_name = VALUES(branch_name)`,
+      [vendorId, accountHolder, accountNumber, ifscCode, bankName, branchName || null]
+    );
+
+    res.json({
+      success: true,
+      message: 'Bank details saved successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getVendorDashboard = async (req, res, next) => {
+  try {
+    const vendorId = req.user.userId;    const [todayOrders] = await query(
+      `SELECT
+         COUNT(*) as count,
+         COALESCE(SUM(vendor_amount), 0) as revenue
+       FROM (
+         SELECT
+           o.id,
+           COALESCE(SUM(oi.quantity * oi.price), (o.total_amount - o.delivery_charge)) AS vendor_amount
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         WHERE o.vendor_id = ? AND DATE(o.created_at) = CURDATE()
+         GROUP BY o.id, o.total_amount, o.delivery_charge
+       ) t`,
+      [vendorId]
+    );
+
+const [totalOrders] = await query(
       'SELECT COUNT(*) as count FROM orders WHERE vendor_id = ?',
       [vendorId]
     );
@@ -26,16 +82,21 @@ export const getVendorDashboard = async (req, res, next) => {
     const [totalProducts] = await query(
       'SELECT COUNT(*) as count FROM products WHERE vendor_id = ? AND status = 1',
       [vendorId]
-    );
-
-    const [totalRevenue] = await query(
-      `SELECT COALESCE(SUM(total_amount), 0) as amount
-       FROM orders
-       WHERE vendor_id = ? AND payment_status = 'PAID'`,
+    );    const [totalRevenue] = await query(
+      `SELECT COALESCE(SUM(vendor_amount), 0) as amount
+       FROM (
+         SELECT
+           o.id,
+           COALESCE(SUM(oi.quantity * oi.price), (o.total_amount - o.delivery_charge)) AS vendor_amount
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         WHERE o.vendor_id = ? AND o.payment_status = 'PAID'
+         GROUP BY o.id, o.total_amount, o.delivery_charge
+       ) t`,
       [vendorId]
     );
 
-    res.json({
+res.json({
       success: true,
       data: {
         todayOrders: todayOrders.count,
@@ -102,7 +163,7 @@ export const updateOrderStatus = async (req, res, next) => {
     const { orderId } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'];
+    const allowedStatuses = ['ACCEPTED', 'PREPARING', 'DISPATCHED', 'DELIVERED', 'CANCELLED'];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
@@ -124,14 +185,21 @@ export const updateOrderStatus = async (req, res, next) => {
     }
 
     await transaction(async (conn) => {
+      const statusNorm = String(status || '').trim().toUpperCase();
       await conn.execute(
-        'UPDATE orders SET order_status = ? WHERE id = ?',
-        [status, orderId]
+        `UPDATE orders
+         SET order_status = ?,
+             payment_status = CASE
+               WHEN LOWER(TRIM(payment_mode)) = 'cod' AND ? = 'DELIVERED' THEN 'PAID'
+               ELSE payment_status
+             END
+         WHERE id = ? AND vendor_id = ?`,
+        [statusNorm, statusNorm, orderId, vendorId]
       );
 
       await conn.execute(
         'INSERT INTO order_status_history (order_id, status) VALUES (?, ?)',
-        [orderId, status]
+        [orderId, statusNorm]
       );
     });
 
@@ -256,7 +324,7 @@ export const updateProduct = async (req, res, next) => {
         `UPDATE products
          SET name = ?, description = ?, price = ?, category_id = ?, image = ?, status = ?
          WHERE id = ?`,
-        [name, description, price, categoryId, image, status !== undefined ? status : product.status, productId]
+        [name ?? product.name, description ?? product.description, price ?? product.price, categoryId ?? product.category_id, image, status !== undefined ? status : product.status, productId]
       );
 
       if (stock !== undefined) {
@@ -318,25 +386,35 @@ export const deleteProduct = async (req, res, next) => {
 
 export const getVendorEarnings = async (req, res, next) => {
   try {
-    const vendorId = req.user.userId;
-
-    const [totalEarnings] = await query(
-      `SELECT COALESCE(SUM(total_amount), 0) as amount
-       FROM orders
-       WHERE vendor_id = ? AND payment_status = 'PAID'`,
+    const vendorId = req.user.userId;    const [totalEarnings] = await query(
+      `SELECT COALESCE(SUM(vendor_amount), 0) as amount
+       FROM (
+         SELECT
+           o.id,
+           COALESCE(SUM(oi.quantity * oi.price), (o.total_amount - o.delivery_charge)) AS vendor_amount
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         WHERE o.vendor_id = ? AND o.payment_status = 'PAID'
+         GROUP BY o.id, o.total_amount, o.delivery_charge
+       ) t`,
+      [vendorId]
+    );    const [monthlyEarnings] = await query(
+      `SELECT COALESCE(SUM(vendor_amount), 0) as amount
+       FROM (
+         SELECT
+           o.id,
+           COALESCE(SUM(oi.quantity * oi.price), (o.total_amount - o.delivery_charge)) AS vendor_amount
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         WHERE o.vendor_id = ? AND o.payment_status = 'PAID'
+           AND MONTH(o.created_at) = MONTH(CURDATE())
+           AND YEAR(o.created_at) = YEAR(CURDATE())
+         GROUP BY o.id, o.total_amount, o.delivery_charge
+       ) t`,
       [vendorId]
     );
 
-    const [monthlyEarnings] = await query(
-      `SELECT COALESCE(SUM(total_amount), 0) as amount
-       FROM orders
-       WHERE vendor_id = ? AND payment_status = 'PAID'
-         AND MONTH(created_at) = MONTH(CURDATE())
-         AND YEAR(created_at) = YEAR(CURDATE())`,
-      [vendorId]
-    );
-
-    const [pendingPayouts] = await query(
+const [pendingPayouts] = await query(
       `SELECT COALESCE(SUM(payout_amount), 0) as amount
        FROM vendor_payouts
        WHERE vendor_id = ? AND payout_status = 'pending'`,

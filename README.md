@@ -251,7 +251,7 @@ VALUES (
 ## 🌐 API Endpoints
 
 ### Authentication
-- `POST /api/auth/user/login-otp` - Send OTP to user
+- `POST /api/auth/user/login-otp-email` - Send OTP to user
 - `POST /api/auth/user/verify-otp` - Verify OTP & login
 - `POST /api/auth/vendor/login-otp` - Vendor OTP login
 - `POST /api/auth/admin/login` - Admin email/password login

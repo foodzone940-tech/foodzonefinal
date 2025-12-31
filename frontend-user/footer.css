@@ -202,3 +202,6 @@
     justify-content: center;
   }
 }
+
+/* Dynamic branding image */
+.footer-logo-img{height:28px;width:auto;display:inline-block;vertical-align:middle;}

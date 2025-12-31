@@ -1,2 +1,20 @@
 node_modules
 .env
+
+# backups/logs/env/sql/uploads
+backend/uploads/
+backend/nohup.out
+backend/curl
+backend/.env.bak*
+backend/server.js.bak*
+backend/src/**/*.bak*
+frontend-*/**/*.bak*
+backend/*.sql
+
+# local temp junk
+backend/real_test_800x400.png
+frontend-user/PY
+frontend-user/else:
+frontend-user/if
+
+backend/package-lock.json

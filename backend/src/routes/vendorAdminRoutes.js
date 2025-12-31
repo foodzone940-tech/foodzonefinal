@@ -12,10 +12,10 @@ import {
   deleteProduct,
   getVendorEarnings,
   updateVendorProfile,
-    getVendorBankDetails,
-    upsertVendorBankDetails
+  getVendorBankDetails,
+  upsertVendorBankDetails
 } from '../controllers/vendorController.js';
-import { vendorAuthMiddleware } from '../middleware/auth.js';
+import { vendorAdminAuthMiddleware } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
@@ -25,7 +25,7 @@ const storage = multer.diskStorage({
     cb(null, process.env.UPLOAD_DIR || './uploads');
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
@@ -38,14 +38,12 @@ const upload = multer({
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
+    if (mimetype && extname) return cb(null, true);
     cb(new Error('Only image files (JPEG, PNG) are allowed'));
   }
 });
 
-router.use(vendorAuthMiddleware);
+router.use(vendorAdminAuthMiddleware);
 
 router.get('/dashboard', asyncHandler(getVendorDashboard));
 router.get('/orders', asyncHandler(getVendorOrders));
@@ -90,10 +88,8 @@ router.put(
 );
 
 router.delete('/products/:productId', asyncHandler(deleteProduct));
-  router.get('/earnings', asyncHandler(getVendorEarnings));
 
-
-
+router.get('/earnings', asyncHandler(getVendorEarnings));
 
 router.get('/bank-details', asyncHandler(getVendorBankDetails));
 

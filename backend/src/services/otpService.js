@@ -1,7 +1,34 @@
 import axios from 'axios';
+import nodemailer from 'nodemailer';
 import { query } from '../config/database.js';
 
 class OTPService {
+  constructor() {
+    this.mailer = null;
+  }
+
+  getMailer() {
+    if (this.mailer) return this.mailer;
+
+    const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    if (!host || !user || !pass) return null;
+
+    const port = Number(process.env.SMTP_PORT || 465);
+    const secure = String(process.env.SMTP_SECURE || 'true') === 'true';
+
+    this.mailer = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass }
+    });
+
+    return this.mailer;
+  }
+
   generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
@@ -70,6 +97,78 @@ class OTPService {
     } catch (error) {
       console.error('Twilio error:', error.response?.data || error.message);
       throw new Error('Failed to send OTP via Twilio');
+    }
+  }
+
+  async sendViaEmail(email, otp) {
+    try {
+      const mailer = this.getMailer();
+
+      if (!mailer) {
+        throw new Error('SMTP credentials not configured');
+      }
+
+      const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+      const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
+      const fromName = process.env.SMTP_FROM_NAME || 'FoodZone';
+      
+      const info = await mailer.sendMail({
+        from: `${fromName} <${fromEmail}>`,
+        replyTo: fromEmail,
+        to: email,
+        subject: 'FoodZone OTP Verification',
+        headers: {
+          'X-Priority': '1 (Highest)',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'High'
+        },
+        text: `Your FoodZone OTP is ${otp}. Valid for 10 minutes. Do not share with anyone.`,
+        html: `<p>Your <b>FoodZone OTP</b> is <b>${otp}</b>.</p><p>Valid for 10 minutes. Do not share with anyone.</p><p style="color:#666;font-size:12px">If you didn’t request this, ignore this email.</p>`
+      });
+
+      return !!info?.messageId;
+    } catch (error) {
+      console.error('Email OTP error:', error.response?.data || error.message);
+      throw new Error('Failed to send OTP via Email');
+    }
+  }
+
+  async sendOTPEmail(email, userId) {
+    const otp = this.generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    try {
+      let sent = false;
+
+      const mailer = this.getMailer();
+      if (mailer) {
+        sent = await this.sendViaEmail(email, otp);
+      } else {
+        console.log(`📧 OTP for ${email}: ${otp} (Demo mode - configure SMTP)`);
+        sent = true;
+      }
+
+      if (sent) {
+        await query(
+          `INSERT INTO otp_verification (user_id, otp_code, expires_at, verified)
+           VALUES (?, ?, ?, 0)`,
+          [userId, otp, expiresAt]
+        );
+
+        await query(
+          `INSERT INTO api_logs (endpoint, request_method, request_data, ip_address, response_status)
+           VALUES (?, ?, ?, ?, ?)`,
+          ['/otp/email', 'POST', JSON.stringify({ email, userId }), 'system', 200]
+        );
+
+        return { success: true, message: 'OTP sent successfully' };
+      }
+
+      throw new Error('Failed to send OTP');
+    } catch (error) {
+      console.error('OTP email send error:', error);
+      throw error;
     }
   }
 

@@ -250,11 +250,20 @@ export const getCartSummary = async (req, res, next) => {
     }
 
     const [deliverySettings] = await query(
-      'SELECT base_charge FROM delivery_settings LIMIT 1'
+      'SELECT base_charge, free_distance_km, extra_charge_per_km FROM delivery_settings LIMIT 1'
     );
+      const baseCharge = Number(deliverySettings?.base_charge ?? 25);
+      const freeDistanceKm = Number(deliverySettings?.free_distance_km ?? 1.5);
+      const extraChargePerKm = Number(deliverySettings?.extra_charge_per_km ?? 15);
 
-    const deliveryCharge = deliverySettings?.base_charge || 25;
+      // Optional: pass ?distanceKm= in query to calculate extra km charge
+      const distanceKm = Number(req.query?.distanceKm ?? req.query?.distance_km ?? 0);
 
+      let deliveryCharge = baseCharge;
+      if (Number.isFinite(distanceKm) && distanceKm > freeDistanceKm) {
+        const extraKm = distanceKm - freeDistanceKm;
+        deliveryCharge = baseCharge + (Math.ceil(extraKm) * extraChargePerKm);
+      }
     res.json({
       success: true,
       data: {

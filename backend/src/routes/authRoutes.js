@@ -3,13 +3,14 @@ import { body } from 'express-validator';
 import {
   userRegister,
   userLogin,
-  userLoginWithOTP,
+    userLoginWithEmailOTP,
   verifyUserOTP,
   vendorLogin,
-  vendorLoginWithOTP,
+    vendorLoginWithEmailOTP,
   verifyVendorOTP,
   adminLogin,
-  refreshAccessToken
+    vendorAdminLogin,
+    refreshAccessToken
 } from '../controllers/authController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { loginLimiter, otpLimiter } from '../middleware/rateLimiter.js';
@@ -35,16 +36,14 @@ router.post(
   ],
   asyncHandler(userLogin)
 );
-
-router.post(
-  '/user/login-otp',
-  otpLimiter,
-  [
-    body('phone').trim().matches(/^[0-9]{10}$/).withMessage('Valid phone number required')
-  ],
-  asyncHandler(userLoginWithOTP)
-);
-
+  router.post(
+    '/user/login-otp-email',
+    otpLimiter,
+    [
+      body('email').isEmail().withMessage('Valid email required')
+    ],
+    asyncHandler(userLoginWithEmailOTP)
+  );
 router.post(
   '/user/verify-otp',
   [
@@ -63,16 +62,14 @@ router.post(
   ],
   asyncHandler(vendorLogin)
 );
-
-router.post(
-  '/vendor/login-otp',
-  otpLimiter,
-  [
-    body('phone').trim().matches(/^[0-9]{10}$/).withMessage('Valid phone number required')
-  ],
-  asyncHandler(vendorLoginWithOTP)
-);
-
+  router.post(
+    '/vendor/login-otp-email',
+    otpLimiter,
+    [
+      body('email').isEmail().withMessage('Valid email required')
+    ],
+    asyncHandler(vendorLoginWithEmailOTP)
+  );
 router.post(
   '/vendor/verify-otp',
   [
@@ -81,7 +78,6 @@ router.post(
   ],
   asyncHandler(verifyVendorOTP)
 );
-
 router.post(
   '/admin/login',
   loginLimiter,
@@ -91,6 +87,17 @@ router.post(
   ],
   asyncHandler(adminLogin)
 );
+
+router.post(
+  '/vendor-admin/login',
+  loginLimiter,
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password is required')
+  ],
+  asyncHandler(vendorAdminLogin)
+);
+
 
 router.post(
   '/refresh-token',

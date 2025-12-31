@@ -40,13 +40,30 @@ export const createOrder = async (req, res, next) => {
     }
 
     const [deliverySettings] = await query(
-      'SELECT base_charge FROM delivery_settings LIMIT 1'
-    );
+        'SELECT base_charge, free_distance_km, extra_charge_per_km FROM delivery_settings LIMIT 1'
+      );
 
-    const deliveryCharge = deliverySettings?.base_charge || 25;
-    const totalAmount = subtotal + deliveryCharge;
+      const baseCharge = Number(deliverySettings?.base_charge ?? 25);
+      const freeDistanceKm = Number(deliverySettings?.free_distance_km ?? 1.5);
+      const extraChargePerKm = Number(deliverySettings?.extra_charge_per_km ?? 15);
 
-    const orderId = await transaction(async (conn) => {
+      // Optional: distance can be passed in body/query
+      const distanceKm = Number(
+        req.body?.distanceKm ??
+        req.body?.distance_km ??
+        req.query?.distanceKm ??
+        req.query?.distance_km ??
+        0
+      );
+
+      let deliveryCharge = baseCharge;
+      if (Number.isFinite(distanceKm) && distanceKm > freeDistanceKm) {
+        const extraKm = distanceKm - freeDistanceKm;
+        deliveryCharge = baseCharge + (Math.ceil(extraKm) * extraChargePerKm);
+      }
+
+      const totalAmount = subtotal + deliveryCharge;
+const orderId = await transaction(async (conn) => {
       const [orderResult] = await conn.execute(
         `INSERT INTO orders (user_id, vendor_id, delivery_address, total_amount, delivery_charge, payment_mode, payment_status, order_status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -114,7 +131,31 @@ export const createOrder = async (req, res, next) => {
           paymentRequired: false
         }
       });
-    }
+    } else if (paymentMode === 'scanner' || paymentMode === 'upi' || paymentMode === 'qr') {
+        await query(
+          'UPDATE orders SET payment_status = ?, order_status = ? WHERE id = ?',
+          ['PENDING_QR', 'PLACED', orderId]
+        );
+
+        await query(
+          'INSERT INTO order_status_history (order_id, status) VALUES (?, ?)',
+          [orderId, 'PLACED']
+        );
+
+        await notificationService.sendOrderNotification(orderId, 'PLACED');
+
+        return res.json({
+          success: true,
+          message: 'Order placed. Pay via QR and wait for confirmation.',
+          data: {
+            orderId,
+            totalAmount,
+            paymentRequired: true,
+            paymentMode: 'scanner'
+          }
+        });
+      }
+
 
     res.json({
       success: true,
