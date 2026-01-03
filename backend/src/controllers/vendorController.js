@@ -260,7 +260,7 @@ export const getVendorProducts = async (req, res, next) => {
 export const createProduct = async (req, res, next) => {
   try {
     const vendorId = req.user.userId;
-    const { name, description, price, categoryId, stock } = req.body;
+    const { name, description = null, price, categoryId, stock } = req.body;
 
     let image = null;
     if (req.file) {

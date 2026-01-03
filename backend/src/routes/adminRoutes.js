@@ -16,7 +16,8 @@ import {
   getActivityLogs,
   getErrorLogs,
   getAPILogs,
-  updateDeliverySettings,
+  getDeliverySettings,
+    updateDeliverySettings,
   createCoupon,
     getPaymentScreenshots,
     getHomepageBanners,
@@ -102,17 +103,17 @@ router.get('/vendors', asyncHandler(getAllVendors));
 
 router.get('/vendors/:vendorId/bank-details', asyncHandler(getVendorBankDetails));
 router.post(
-  '/vendors',
-  [
-    body('vendorName').trim().notEmpty().withMessage('Vendor name is required'),
-    body('phone').trim().matches(/^[0-9]{10}$/).withMessage('Valid 10-digit phone number required'),
-    body('email').optional().isEmail(),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('address').optional().trim(),
-    body('pincode').optional().trim()
-  ],
-  asyncHandler(createVendor)
-);
+    '/vendors',
+    [
+      body('vendorName').trim().notEmpty().withMessage('Vendor name is required'),
+      body('email').isEmail().withMessage('Valid email required'),
+      body('phone').optional().trim().matches(/^[0-9]{10}$/).withMessage('Valid 10-digit phone number required'),
+      body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+      body('address').optional().trim(),
+      body('pincode').optional().trim()
+    ],
+    asyncHandler(createVendor)
+  );
 
 router.put(
   '/vendors/:vendorId/status',
@@ -148,6 +149,9 @@ router.put(
 router.get('/logs/activity', asyncHandler(getActivityLogs));
 router.get('/logs/errors', asyncHandler(getErrorLogs));
 router.get('/logs/api', asyncHandler(getAPILogs));
+
+  router.get('/settings/delivery', asyncHandler(getDeliverySettings));
+
 
 router.put(
   '/settings/delivery',

@@ -20,9 +20,6 @@ import vendorRoutes from './src/routes/vendorRoutes.js';
 import vendorAdminRoutes from './src/routes/vendorAdminRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import publicRoutes from './src/routes/publicRoutes.js';
-
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

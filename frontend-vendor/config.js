@@ -4,7 +4,7 @@ const CONFIG = {
   API_BASE_URL,
   ENDPOINTS: {
     AUTH: {
-      LOGIN_OTP: `${API_BASE_URL}/auth/vendor/login-otp`,
+      LOGIN_OTP: `${API_BASE_URL}/auth/vendor/login-otp-email`,
       VERIFY_OTP: `${API_BASE_URL}/auth/vendor/verify-otp`
     },
     VENDOR: {
@@ -15,7 +15,9 @@ const CONFIG = {
       CREATE_PRODUCT: `${API_BASE_URL}/vendor/products`,
       UPDATE_PRODUCT: (id) => `${API_BASE_URL}/vendor/products/${id}`,
       DELETE_PRODUCT: (id) => `${API_BASE_URL}/vendor/products/${id}`,
-      EARNINGS: `${API_BASE_URL}/vendor/earnings`
+      EARNINGS: `${API_BASE_URL}/vendor/earnings`,
+      PROFILE: `${API_BASE_URL}/vendor/profile`,
+      BANK_DETAILS: `${API_BASE_URL}/vendor/bank-details`
     }
   }
 };

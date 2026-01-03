@@ -184,36 +184,46 @@ export const createVendor = async (req, res, next) => {
   try {
     const { vendorName, phone, email, password, address, pincode } = req.body;
 
-    const [existing] = await query(
-      'SELECT id FROM vendors WHERE phone = ?',
-      [phone]
-    );
+    if (!vendorName) return res.status(400).json({ success: false, message: 'Vendor name is required' });
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!password) return res.status(400).json({ success: false, message: 'Password is required' });
 
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number already registered'
-      });
+    const [existingEmail] = await query('SELECT id FROM vendors WHERE email = ?', [email]);
+    if (existingEmail) {
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    // DB requires phone NOT NULL -> generate if not provided
+    let phoneValue = phone;
+
+    if (!phoneValue) {
+      for (let i = 0; i < 20; i++) {
+        const candidate = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0'); // 10-digit
+        const [exists] = await query('SELECT id FROM vendors WHERE phone = ?', [candidate]);
+        if (!exists) { phoneValue = candidate; break; }
+      }
+      if (!phoneValue) return res.status(500).json({ success: false, message: 'Failed to generate phone number' });
+    } else {
+      const [existingPhone] = await query('SELECT id FROM vendors WHERE phone = ?', [phoneValue]);
+      if (existingPhone) return res.status(400).json({ success: false, message: 'Phone number already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await query(
-      `INSERT INTO vendors (vendor_name, phone, email, password, address, pincode, status)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [vendorName, phone, email || null, hashedPassword, address || null, pincode || null]
+      'INSERT INTO vendors (vendor_name, phone, email, password, address, pincode, status) VALUES (?, ?, ?, ?, ?, ?, 1)',
+      [vendorName, phoneValue, email, hashedPassword, address || null, pincode || null]
     );
 
     await query(
-      `INSERT INTO activity_logs (admin_id, action, ip_address)
-       VALUES (?, ?, ?)`,
-      [req.user.userId, `Created vendor: ${vendorName}`, req.ip]
+      'INSERT INTO activity_logs (admin_id, action, ip_address) VALUES (?, ?, ?)',
+      [req.user.userId, 'Created vendor: ' + vendorName + ' (' + email + ')', req.ip]
     );
 
     res.status(201).json({
       success: true,
       message: 'Vendor created successfully',
-      data: { vendorId: result.insertId }
+      data: { vendorId: result.insertId, phone: phoneValue }
     });
   } catch (error) {
     next(error);
@@ -497,13 +507,15 @@ const [screenshot] = await query(
           }
 
           await conn.execute(
-            `INSERT INTO payment_transactions (order_id, transaction_id, payment_method, amount, status)
-             SELECT ?, ?, ?, ?, 'success'
-             WHERE NOT EXISTS (
-               SELECT 1 FROM payment_transactions WHERE order_id = ? AND status = 'success'
-             )`,
-            [screenshot.order_id, txId, screenshot.payment_method, screenshot.amount, screenshot.order_id]
-          );
+              `INSERT INTO payment_transactions (order_id, transaction_id, payment_method, amount, status)
+               VALUES (?, ?, ?, ?, 'success')
+               ON DUPLICATE KEY UPDATE
+                 transaction_id = VALUES(transaction_id),
+                 payment_method = VALUES(payment_method),
+                 amount = VALUES(amount),
+                 status = 'success'`,
+              [screenshot.order_id, txId, screenshot.payment_method, screenshot.amount]
+            );
 // auto-close other pending screenshots for same order
           await conn.execute(
             "UPDATE payment_screenshots SET status = ? WHERE order_id = ? AND id <> ? AND status IN ('pending','verified')",
@@ -592,6 +604,30 @@ export const getAPILogs = async (req, res, next) => {
     res.json({
       success: true,
       data: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const getDeliverySettings = async (req, res, next) => {
+  try {
+    const rows = await query(
+      'SELECT base_charge, free_distance_km, extra_charge_per_km FROM delivery_settings ORDER BY id DESC LIMIT 1'
+    );
+
+    const d = rows[0] || null;
+
+    return res.json({
+      success: true,
+      data: d
+        ? {
+            baseCharge: Number(d.base_charge),
+            freeDistanceKm: Number(d.free_distance_km),
+            extraChargePerKm: Number(d.extra_charge_per_km)
+          }
+        : null
     });
   } catch (error) {
     next(error);

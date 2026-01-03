@@ -7,7 +7,7 @@
   <meta name="author" content="FoodZone">
   <meta name="application-name" content="foodzone">
   <title>Vendor Dashboard - FoodZone</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260101205714">
 </head>
 <body>
   <div class="dashboard">
@@ -20,6 +20,8 @@
         <a href="#orders" class="nav-item" data-page="orders">📦 Orders</a>
         <a href="#products" class="nav-item" data-page="products">🍔 Products</a>
         <a href="#earnings" class="nav-item" data-page="earnings">💰 Earnings</a>
+        <a href="#profile" class="nav-item" data-page="profile">👤 Profile</a>
+        <a href="#bank" class="nav-item" data-page="bank">🏦 Bank Details</a>
         <a href="#" class="nav-item" id="logoutBtn">🚪 Logout</a>
       </nav>
     </aside>
@@ -59,8 +61,8 @@
     <div class="modal-content">
       <h2>Vendor Login</h2>
       <div class="form-group">
-        <label>Phone Number</label>
-        <input type="tel" id="vendorPhone" placeholder="10-digit mobile number" maxlength="10" class="form-input">
+        <label>Email</label>
+        <input type="email" id="vendorEmail" placeholder="Email address" maxlength="60" class="form-input">
       </div>
       <button id="sendOtpBtn" class="btn btn-primary btn-block">Send OTP</button>
 
@@ -74,7 +76,37 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=20260101205714"></script>
+  <script src="app.js?v=20260101205714"></script>
+
+    <!-- DYNAMIC_BRANDING_V1_START -->
+    <script>
+      (async function() {
+        try {
+          const r = await fetch('/api/public/ui-config', { cache: 'no-store' });
+          const j = await r.json().catch(()=>null);
+          const cfg = (j && (j.data || j)) || {};
+          const fav = cfg.site_favicon;
+          if (fav) {
+            let link = document.querySelector('link[rel~="icon"]');
+            if (!link) {
+              link = document.createElement('link');
+              link.rel = 'icon';
+              document.head.appendChild(link);
+            }
+            link.href = fav;
+          }
+          const logoUrl = cfg.site_logo || cfg.site_app_icon || '';
+          if (logoUrl) {
+            const h = document.querySelector('.sidebar-header h2');
+            if (h) {
+              h.innerHTML = `<img src="${logoUrl}" alt="FoodZone" style="max-height:36px;max-width:180px;vertical-align:middle;">`;
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <!-- DYNAMIC_BRANDING_V1_END -->
+
 </body>
 </html>

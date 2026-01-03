@@ -5,8 +5,8 @@
 }
 
 :root {
-  --primary-color: #2563eb;
-  --primary-dark: #1e40af;
+  --primary-color: #f97316;
+  --primary-dark: #ea580c;
   --secondary-color: #10b981;
   --danger-color: #ef4444;
   --warning-color: #f59e0b;
@@ -101,7 +101,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
+  background-color: transparent;
 }
 
 .btn-secondary {
@@ -127,6 +127,9 @@ body {
   color: var(--white);
   padding: 4rem 0;
   text-align: center;
+
+  /* PC_HERO_MINHEIGHT_V1 */
+  min-height: 320px;
 }
 
 .hero-title {
@@ -497,3 +500,16 @@ body {
 .logo{display:flex;align-items:center;gap:10px;}
 .site-logo-img{height:42px;width:auto;display:block;}
 .footer-logo-img{height:28px;width:auto;display:inline-block;vertical-align:middle;}
+
+
+/* PC_HERO_BANNER_V2 */
+@media (min-width: 992px) {
+  .hero {
+    padding: 0;
+    min-height: 380px;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-color: var(--primary-dark);
+  }
+}

@@ -7,6 +7,12 @@ export const createOrder = async (req, res, next) => {
     const userId = req.user.userId;
     const { deliveryAddress, paymentMode = 'online' } = req.body;
 
+      // ONLINE_BLOCK_EARLY_V1
+      if (paymentMode === 'online' || paymentMode === 'cod') {
+        return res.status(400).json({ success: false, message: 'Only scanner/upi/qr allowed.' });
+      }
+
+
     const cartItems = await query(
       `SELECT c.*, p.name, p.price, p.vendor_id, COALESCE(i.quantity, 0) as stock_quantity
        FROM cart c
@@ -97,7 +103,7 @@ const orderId = await transaction(async (conn) => {
     });
 
     if (paymentMode === 'online') {
-      const paymentOrder = await paymentService.createOrder(orderId, totalAmount);
+const paymentOrder = await paymentService.createOrder(orderId, totalAmount);
 
       return res.json({
         success: true,
@@ -169,6 +175,9 @@ const orderId = await transaction(async (conn) => {
 
 export const verifyPayment = async (req, res, next) => {
   try {
+      // RAZORPAY_DISABLED
+      return res.status(400).json({ success: false, message: 'Online payment disabled. Use scanner/upi/qr.' });
+
     const { orderId } = req.params;
     const paymentData = req.body;
 
@@ -374,7 +383,7 @@ export const uploadPaymentScreenshot = async (req, res, next) => {
     await query(
       `INSERT INTO payment_screenshots (order_id, payment_method, screenshot_url, upi_id, amount, transaction_id, status)
        VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-      [orderId, paymentMethod, screenshotUrl, upiId, order.total_amount, transactionId]
+      [orderId, paymentMethod, screenshotUrl, (upiId || null), order.total_amount, (transactionId || null)]
     );
 
     await query(

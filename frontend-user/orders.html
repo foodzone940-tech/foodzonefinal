@@ -159,7 +159,7 @@
     </div>
   </footer>
 
-  <script src="config.js"></script>
+  <script src="config.js?v=20260101"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       checkAuth();
@@ -185,6 +185,31 @@
         document.getElementById('ordersContent').innerHTML = '<p>Failed to load orders</p>';
       }
     }
+
+      function renderUploadSection(order) {
+        const mode = String(order.payment_mode || order.paymentMode || '').toLowerCase();
+        const pay = String(order.payment_status || '').toUpperCase();
+        const need = ['scanner','upi','qr'].includes(mode) && pay !== 'PAID';
+        if (!need) return '';
+        return `
+          <div style="margin-top:12px; padding:12px; border:1px dashed #e5e7eb; border-radius:12px;">
+            <div style="font-weight:600; margin-bottom:8px;">Upload Payment Screenshot</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <input type="file" id="ss_${order.id}" class="form-input" style="max-width:260px;" accept="image/*,application/pdf">
+              <select id="pm_${order.id}" class="form-input" style="max-width:200px;">
+                <option value="phonepe">PhonePe</option>
+                <option value="googlepay">Google Pay</option>
+                <option value="paytm">Paytm</option>
+              </select>
+              <input type="text" id="tx_${order.id}" class="form-input" style="max-width:200px;" placeholder="Transaction ID (optional)">
+              <input type="text" id="upi_${order.id}" class="form-input" style="max-width:200px;" placeholder="UPI ID (optional)">
+              <button class="btn btn-primary" type="button" onclick="uploadScreenshot(${order.id})">Upload</button>
+            </div>
+            <div id="ssmsg_${order.id}" style="margin-top:8px; font-size:12px; color: var(--gray);"></div>
+          </div>
+        `;
+      }
+
 
     function displayOrders(orders) {
       const ordersContent = document.getElementById('ordersContent');
@@ -226,7 +251,7 @@
               `).join('')}
             </div>
             <div class="order-footer">
-              <div class="order-total">Total: ₹${parseFloat(order.total_amount).toFixed(2)}</div>
+              <div class="order-total">Total: ₹${parseFloat(order.total_amount).toFixed(2)}${order.payment_status ? `<div style="margin-top:6px; font-size:12px; color: var(--gray);">Payment: ${order.payment_status}</div>` : ""}</div>
               <div>
                 ${order.order_status === 'PENDING' || order.order_status === 'PLACED' ?
                   `<button class="btn btn-danger" onclick="cancelOrder(${order.id})">Cancel Order</button>` : ''}
@@ -238,6 +263,50 @@
 
       ordersContent.innerHTML = ordersHTML;
     }
+
+      async function uploadScreenshot(orderId) {
+        const token = getAuthToken();
+        if (!token) return showToast('Please login again', 'error');
+
+        const file = document.getElementById(`ss_${orderId}`)?.files?.[0];
+        if (!file) return showToast('Select screenshot/PDF first', 'error');
+
+        const paymentMethod = document.getElementById(`pm_${orderId}`)?.value || 'phonepe';
+        const transactionId = (document.getElementById(`tx_${orderId}`)?.value || '').trim();
+        const upiId = (document.getElementById(`upi_${orderId}`)?.value || '').trim();
+
+        const fd = new FormData();
+        fd.append('screenshot', file);
+        fd.append('paymentMethod', paymentMethod);
+        if (upiId) fd.append('upiId', upiId);
+        if (transactionId) fd.append('transactionId', transactionId);
+
+        const msg = document.getElementById(`ssmsg_${orderId}`);
+        if (msg) msg.textContent = 'Uploading...';
+
+        try {
+          const resp = await fetch(`/api/orders/${orderId}/upload-screenshot`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: fd
+          });
+          const json = await resp.json().catch(() => null);
+
+          if (!resp.ok || !json || !json.success) {
+            const m = (json && json.message) ? json.message : 'Upload failed';
+            if (msg) msg.textContent = m;
+            return showToast(m, 'error');
+          }
+
+          if (msg) msg.textContent = 'Uploaded. Verification pending.';
+          showToast('Screenshot uploaded. Verification pending.', 'success');
+          loadOrders();
+        } catch (e) {
+          if (msg) msg.textContent = 'Upload failed';
+          showToast('Upload failed', 'error');
+        }
+      }
+
 
     async function cancelOrder(orderId) {
       if (!confirm('Are you sure you want to cancel this order?')) return;

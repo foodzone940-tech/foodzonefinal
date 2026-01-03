@@ -267,3 +267,67 @@ body {
     opacity: 1;
   }
 }
+
+
+/* RESPONSIVE_PATCH_20260101 */
+@media (max-width: 1024px) {
+  :root { --sidebar-width: 220px; }
+  .top-bar { padding: 1rem 1.25rem; }
+  .content { padding: 1.25rem; }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 1rem;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .content {
+    padding: 1rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .modal-content {
+    max-width: 92vw;
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar-header h2 { font-size: 1.05rem; }
+  .nav-item { padding: 0.65rem 0.9rem; }
+}

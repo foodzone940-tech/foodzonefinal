@@ -159,6 +159,10 @@ if (process.env.FIREBASE_ENABLED !== 'true') {
           user: { title: 'Order Ready', message: 'Your order is ready for pickup/delivery' },
           vendor: null
         },
+        'DISPATCHED': {
+          user: { title: 'Out for Delivery', message: 'Your order is out for delivery' },
+          vendor: null
+        },
         'DELIVERED': {
           user: { title: 'Order Delivered', message: 'Your order has been delivered. Enjoy!' },
           vendor: { title: 'Order Completed', message: `Order #${orderId} marked as delivered` }

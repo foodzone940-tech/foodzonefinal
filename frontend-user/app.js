@@ -14,6 +14,10 @@ async function loadUiConfig() {
 
     const banners = (json.data && json.data.banners) ? json.data.banners : [];
 
+      // Global delivery settings (camelCase) for all pages
+      window.FZ_DELIVERY_SETTINGS = (json.data && json.data.deliverySettings) ? json.data.deliverySettings : null;
+
+
     // Header logo
     // Favicon
     if (cfg.site_favicon) {
@@ -47,10 +51,12 @@ async function loadUiConfig() {
     if (banners.length && banners[0].image_url) {
       const hero = document.querySelector('.hero');
       if (hero) {
-        hero.style.backgroundImage = `linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), url('${banners[0].image_url}')`;
+        hero.style.backgroundImage = `url('${banners[0].image_url}')`;
+        const isDesktop = window.matchMedia('(min-width: 992px)').matches;
         hero.style.backgroundSize = 'cover';
         hero.style.backgroundPosition = 'center';
         hero.style.backgroundRepeat = 'no-repeat';
+        hero.style.backgroundColor = 'var(--primary-dark)';
       }
     }
   } catch (e) {

@@ -154,31 +154,20 @@ export const userLoginWithEmailOTP = async (req, res, next) => {
       [email]
     );
 
-    // Email-only login: auto-create user if not exists (phone/password are NOT NULL in DB)
-    if (!user) {
-      const name = (email.split('@')[0] || 'User').slice(0, 255);
-      const randomPwd = crypto.randomBytes(16).toString('hex');
-      const hashedPassword = await bcrypt.hash(randomPwd, 10);
+          // Email OTP login: create user on first login (email-only)
+      if (!user) {
+        const name = (email.split('@')[0] || 'User').slice(0, 255);
 
-      let phone = null;
+        const randomPwd = crypto.randomBytes(16).toString('hex');
+        const hashedPassword = await bcrypt.hash(randomPwd, 10);
 
-      for (let i = 0; i < 5; i++) {
-        const hashHex = crypto.createHash('sha1').update(`${email}:${i}`).digest('hex');
-        const n = (BigInt('0x' + hashHex.slice(0, 12)) % 10000000000n);
-        const ten = (6000000000n + (n % 4000000000n)); // 10-digit, starts 6-9
-        phone = ten.toString().padStart(10, '0');
+        const result = await query(
+          `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`,
+          [name, email, hashedPassword]
+        );
 
-        const [existingPhone] = await query('SELECT id FROM users WHERE phone = ?', [phone]);
-        if (!existingPhone) break;
+        user = { id: result.insertId, name, email };
       }
-
-      const result = await query(
-        `INSERT INTO users (name, phone, email, password) VALUES (?, ?, ?, ?)`,
-        [name, phone, email, hashedPassword]
-      );
-
-      user = { id: result.insertId, name, email };
-    }
 
     await otpService.sendOTPEmail(email, user.id);
 

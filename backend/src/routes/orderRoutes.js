@@ -47,7 +47,7 @@ router.post(
   '/',
   [
     body('deliveryAddress').trim().notEmpty().withMessage('Delivery address is required'),
-    body('paymentMode').isIn(['online', 'cod', 'scanner', 'upi', 'qr']).withMessage('Valid payment mode required')
+    body('paymentMode').isIn(['scanner', 'upi', 'qr']).withMessage('Valid payment mode required')
   ],
   asyncHandler(createOrder)
 );
@@ -58,7 +58,7 @@ router.post(
   '/:orderId/upload-screenshot',
   upload.single('screenshot'),
   [
-    body('paymentMethod').isIn(['paytm', 'phonepe', 'googlepay']).withMessage('Valid payment method required'),
+    body('paymentMethod').isIn(['paytm', 'phonepe', 'googlepay', 'scanner', 'upi', 'qr']).withMessage('Valid payment method required'),
     body('upiId').optional().trim(),
     body('transactionId').optional().trim()
   ],
